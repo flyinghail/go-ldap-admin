@@ -76,6 +76,19 @@ func (d FeiShuLogic) AddDepts(group *model.Group) error {
 		if err != nil {
 			return tools.NewOperationError(fmt.Errorf("添加部门: %s, 失败: %s", group.GroupName, err.Error()))
 		}
+	} else {
+		oldData := new(model.Group)
+		err = isql.Group.Find(tools.H{"source_dept_id": group.SourceDeptId}, oldData)
+		if err != nil {
+			return tools.NewMySqlError(fmt.Errorf("查询部门: %s, 失败：%s", group.SourceDeptId, err.Error()))
+		}
+
+		if (group.GroupName != oldData.GroupName) || (group.SourceDeptParentId != group.SourceDeptParentId) {
+			err = CommonUpdateGroup(oldData, group)
+			if err != nil {
+				return tools.NewOperationError(fmt.Errorf("更新部门: %s, 失败: %s", group.GroupName, err.Error()))
+			}
+		}
 	}
 	return nil
 }
@@ -159,6 +172,20 @@ func (d FeiShuLogic) AddUsers(user *model.User) error {
 		err = CommonAddUser(user, groups)
 		if err != nil {
 			return tools.NewOperationError(fmt.Errorf("添加用户: %s, 失败: %s", user.Username, err.Error()))
+		}
+	} else {
+		oldData := new(model.User)
+		if err = isql.User.Find(tools.H{"source_union_id": user.SourceUnionId}, oldData); err != nil {
+			return tools.NewMySqlError(fmt.Errorf("查询用户: %s, 失败: %s", user.SourceUserId, err.Error()))
+		}
+		if (user.Username != oldData.Username) || (user.Mail != oldData.Mail) || (user.Mobile != oldData.Mobile) {
+			user.Model = oldData.Model
+			user.Roles = oldData.Roles
+			user.Password = oldData.Password
+			user.UserDN = oldData.UserDN
+			if err = CommonUpdateUser(oldData, user, tools.StringToSlice(user.DepartmentId, ",")); err != nil {
+				return tools.NewOperationError(fmt.Errorf("更新用户: %s, 失败: %s", user.Username, err.Error()))
+			}
 		}
 	}
 	return nil
